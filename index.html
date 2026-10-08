@@ -51,6 +51,7 @@ canvas{width:100%;aspect-ratio:1;flex:none;display:block;touch-action:none;curso
 header{flex-wrap:wrap;gap:4px 12px}
 .key{flex-wrap:wrap}.key button{flex:1 1 110px}
 #fxb{position:fixed;right:18px;bottom:18px;z-index:5;width:48px;height:48px;min-height:0;padding:0;border-radius:50%;font-size:18px;background:var(--panelA);opacity:.6}
+.ctl .a{flex:0 0 42px;width:42px;height:42px;min-height:0;padding:0;border-radius:50%;font-size:12px}.ctl .a.on{background:var(--c);border-color:var(--c);color:#0f1420}
 </style>
 </head>
 <body>
@@ -97,6 +98,7 @@ const PRE=[
 ];
 const eu=(s,L)=>(((s+L.r)%L.n)*L.k)%L.n<L.k;
 const TIMB=[null,['Sub','Morbido','FM'],['Campana','Kalimba','Piano','Flauto','Tondo'],['Caldo','Vitreo','Drone']];
+const ARP=[[0,2,4,7,4,2],[0,2,4,2,7,4],[0,4,2,7,2,4],[4,2,0,2,4,7]];
 const BP=[{name:'Lungo'},{name:'Impulso',l:{k:3,n:8,r:0}},{name:'Sincope',l:{k:5,n:16,r:2}},{name:'Ostinato',l:{k:5,n:8,r:0}},{name:'Kick'}];
 const C=[
  {role:'',pre:1,div:4,ratio:1},
@@ -363,6 +365,11 @@ function drawFx(now){
   }
   x.globalCompositeOperation='source-over';
 }
+function arpIdx(c,ch){
+  if(c.as%6===0)c.ap=ARP[c.as?Math.random()*ARP.length|0:0];
+  const r=ch>=3?ch-7:ch;
+  return r+c.ap[c.as++%6];
+}
 var lock=false;
 function chord(x,y,dx,dy){const b=x*dx+y*dy,cc=x*x+y*y-1;return -b+Math.sqrt(Math.max(0,b*b-cc));}
 function lockStart(c,b,ts){
@@ -425,7 +432,7 @@ function play(i,t,p,fo){
     else if(tm===1){note(bf,t,'sawtooth',at,bd,.38,.15,380);note(bf,t,'sine',at,bd,.5,.15,500);}
     else{fmv(bf,1,2.4,.3,t,at,bd,.6,.15,800);note(bf,t,'sine',at,bd,.4,.15,500);}
   }else if(i===2){
-    const f=fq(fo!==undefined?fo:walk(c,-2,8,ch),60),tm=c.tm;recN(2,t,mn(f),[2,1.2,2,1.8,2.2][tm],75);
+    const f=fq(fo!==undefined?fo:(c.arp?arpIdx(c,ch):walk(c,-2,8,ch)),60),tm=c.tm;recN(2,t,mn(f),[2,1.2,2,1.8,2.2][tm],75);
     if(tm===0)fmv(f,2.76,1.3,.9,t,.004,3,.16,.75,1500);
     else if(tm===1){note(f,t,'sine',.003,1.3,.24,.6,3200);note(f*5.4,t,'sine',.002,.12,.05,.6,4000);}
     else if(tm===2){fmv(f,1,1.5,1,t,.008,2.4,.2,.65,2200);note(f*2,t,'sine',.005,.6,.03,.65,2500);}
@@ -457,7 +464,7 @@ function sched(){
         if(c.bp===4){const L=PRE[C[0].pre].l.find(L=>L.s===0),q=(t-t0)/per(C[0]),k0=Math.round(q);h=!!L&&Math.abs(q-k0)<.02&&eu(k0,L);}
         else h=eu(c.k,BP[c.bp].l);
         if(h){play(i,t,p);c.ls=t;}
-      }else if(Math.random()<DENS[c.dl]){play(i,t,p);c.ls=t;}
+      }else if(Math.random()<((i===2&&c.arp)?[0,.55,.8,1][c.dl]:DENS[c.dl])){play(i,t,p);c.ls=t;}
       c.k++;
     }
   });
@@ -493,9 +500,9 @@ function setBpm(v){
 const grid=document.getElementById('grid');
 C.forEach((c,i)=>{
   const cell=document.createElement('div');cell.className='cell';
-  cell.innerHTML='<canvas aria-label="Cerchio '+(i+1)+'"></canvas><div class="ctl"><button class="s"></button>'+(i===1?'<button class="d"></button>':'')+'</div><div class="rr"></div>';
+  cell.innerHTML='<canvas aria-label="Cerchio '+(i+1)+'"></canvas><div class="ctl"><button class="s"></button>'+(i===1?'<button class="d"></button>':'')+(i===2?'<button class="a" aria-pressed="false" aria-label="Arpeggio">arp</button>':'')+'</div><div class="rr"></div>';
   grid.appendChild(cell);
-  c.cv=cell.querySelector('canvas');c.sb=cell.querySelector('.s');c.rr=cell.querySelector('.rr');cell.style.setProperty('--c',COL[i]);c.db=cell.querySelector('.d');if(c.db)c.db.setAttribute('aria-label','Densità delle note (solo Lungo)');
+  c.cv=cell.querySelector('canvas');c.sb=cell.querySelector('.s');c.rr=cell.querySelector('.rr');cell.style.setProperty('--c',COL[i]);c.db=cell.querySelector('.d');c.ab=cell.querySelector('.a');if(c.db)c.db.setAttribute('aria-label','Densità delle note (solo Lungo)');
   c.sb.setAttribute('aria-label',i<2?'Cambia pattern ritmico':'Cambia densità delle note');
   c.rbs=R.map((v,j)=>{
     const b=document.createElement('button');b.textContent=RL[j];b.setAttribute('aria-label','Rapporto '+fmt(v));
@@ -506,10 +513,11 @@ C.forEach((c,i)=>{
     c.sb.textContent=i===0?PRE[c.pre].name:i===1?BP[c.bp].name:c.role+' '+DL[c.dl];
     if(i>1)c.sb.title='Densità '+DN[c.dl];
     if(c.db){c.db.textContent=DL[c.dl];c.db.disabled=c.bp!==0;c.db.title='Densità '+DN[c.dl];}
+    if(c.ab){c.ab.classList.toggle('on',!!c.arp);c.ab.setAttribute('aria-pressed',String(!!c.arp));}
     c.rbs.forEach((b,j)=>b.classList.toggle('on',R[j]===c.ratio));
   };
   ui();
-  c.vol=.8;c.fv=1;c.balls=[];c.nb=0;
+  c.vol=.8;c.fv=1;c.balls=[];c.nb=0;c.arp=false;c.as=0;
   const pt=e=>{const r=c.cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,w:r.width};};
   const inB=e=>{const r=c.cv.getBoundingClientRect();return Math.hypot(e.clientX-r.right+24,e.clientY-r.bottom+24)<26;};
   const grab=e=>{
@@ -555,6 +563,7 @@ C.forEach((c,i)=>{
     ui();
   });
   if(c.db)c.db.addEventListener('click',()=>{c.dl=(c.dl+1)%4;ui();});
+  if(c.ab)c.ab.addEventListener('click',()=>{c.arp=!c.arp;c.as=0;ui();});
 });
 document.getElementById('m').onclick=()=>setBpm(bpm-1);
 document.getElementById('p').onclick=()=>setBpm(bpm+1);
