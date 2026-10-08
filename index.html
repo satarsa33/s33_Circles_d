@@ -94,11 +94,26 @@ const PRE=[
  {name:'Respiro',l:[{s:0,k:2,n:16,r:0},{s:3,k:3,n:7,r:0},{s:2,k:3,n:16,r:5}]},
  {name:'Tresillo',l:[{s:0,k:3,n:8,r:0},{s:1,k:2,n:8,r:2},{s:2,k:5,n:8,r:1}]},
  {name:'Clave',l:[{s:0,k:3,n:8,r:0},{s:1,k:5,n:16,r:0},{s:3,k:4,n:16,r:1}]},
- {name:'Poli',l:[{s:0,k:4,n:16,r:0},{s:1,k:3,n:10,r:0},{s:3,k:5,n:12,r:0},{s:2,k:7,n:9,r:0}]}
+ {name:'Poli',l:[{s:0,k:4,n:16,r:0},{s:1,k:3,n:10,r:0},{s:3,k:5,n:12,r:0},{s:2,k:7,n:9,r:0}]},
+ {name:'Sparso',l:[{s:0,k:1,n:16,r:0},{s:2,k:2,n:16,r:6},{s:3,k:2,n:12,r:3}]},
+ {name:'Cuore',l:[{s:0,k:1,n:16,r:0},{s:0,k:1,n:16,r:13},{s:2,k:3,n:16,r:5}]},
+ {name:'Bossa',l:[{s:0,k:3,n:8,r:0},{s:1,k:5,n:16,r:2},{s:2,k:8,n:16,r:0}]},
+ {name:'Four',l:[{s:0,k:4,n:16,r:0},{s:2,k:8,n:16,r:1},{s:3,k:3,n:16,r:6}]},
+ {name:'Dub',l:[{s:0,k:2,n:8,r:0},{s:1,k:1,n:8,r:4},{s:2,k:3,n:8,r:1}]},
+ {name:'Shuffle',l:[{s:0,k:4,n:12,r:0},{s:1,k:3,n:12,r:2},{s:2,k:8,n:12,r:1}]},
+ {name:'Bembé',l:[{s:3,k:7,n:12,r:0},{s:0,k:3,n:12,r:0},{s:1,k:5,n:12,r:2}]},
+ {name:'Sette',l:[{s:0,k:3,n:7,r:0},{s:1,k:2,n:7,r:3},{s:2,k:5,n:7,r:1}]},
+ {name:'Nebbia',l:[{s:0,k:2,n:13,r:0},{s:3,k:3,n:11,r:0},{s:1,k:2,n:7,r:3},{s:2,k:5,n:17,r:0}]}
 ];
 const eu=(s,L)=>(((s+L.r)%L.n)*L.k)%L.n<L.k;
-const TIMB=[null,['Sub','Morbido','FM'],['Campana','Kalimba','Piano','Flauto','Tondo'],['Caldo','Vitreo','Drone']];
+const TIMB=[null,['Sub','Morbido','FM','Pulse','Legno','Growl','Cavo'],['Campana','Kalimba','Piano','Flauto','Tondo'],['Caldo','Vitreo','Drone']];
 const ARP=[[0,2,4,7,4,2],[0,2,4,2,7,4],[0,4,2,7,2,4],[4,2,0,2,4,7]];
+const FILLS=[
+ [[[7,45]],[[7,52]],[[7,60]],[[7,68]],[[7,78]],[[7,88]],[[7,100]],[[7,112]]],
+ [[[4,100]],[[4,85]],[[5,100]],[[5,85]],[[6,100]],[[6,85]],[[6,110],[0,100]],[[0,115]]],
+ [[[0,105]],[],[[7,90]],[],[[7,85]],[[7,100]],[[4,100]],[[6,112],[0,100]]],
+ [[[2,60]],[[2,70]],[[2,80],[1,70]],[[2,90]],[[3,95]],[[3,100]],[[5,100]],[[6,112]]]
+];
 const BP=[{name:'Lungo'},{name:'Impulso',l:{k:3,n:8,r:0}},{name:'Sincope',l:{k:5,n:16,r:2}},{name:'Ostinato',l:{k:5,n:8,r:0}},{name:'Kick'}];
 const C=[
  {role:'',pre:1,div:4,ratio:1},
@@ -405,6 +420,33 @@ function padHit(c,fo,t,d,tm,p){
   else drone(fq(fo,36),t,2,Math.min(p*3.5,9),.08,.9);
   recN(3,t,mn(tm===2?fq(fo,36):tm===1?f*2:f),1.2+d*.6,70);
 }
+var shpC={};
+function curve(d){
+  if(!shpC[d]){const n=2048,c=new Float32Array(n),th=Math.tanh(d);for(let i=0;i<n;i++){const x=i*2/(n-1)-1;c[i]=Math.tanh(x*d)/th;}shpC[d]=c;}
+  return shpC[d];
+}
+function bv(f,t,at,bd,pk,wet,L,drive,lp,dec){
+  const dur=at+bd+.1,k=bus(t,at,bd,pk,wet),fl=ac.createBiquadFilter(),mix=ac.createGain();
+  fl.type='lowpass';fl.Q.value=.8;
+  fl.frequency.setValueAtTime(lp*2.2,t);fl.frequency.exponentialRampToValueAtTime(lp,t+(dec||.25));
+  L.forEach(([ty,r,g])=>{const o=osc(ty,f*r,t,dur),og=ac.createGain();og.gain.value=g;o.connect(og);og.connect(mix);trk(o,k,t);});
+  if(drive){const ws=ac.createWaveShaper();ws.curve=curve(drive);ws.oversample='2x';mix.connect(ws);ws.connect(fl);}
+  else mix.connect(fl);
+  fl.connect(k);
+}
+const BASS=[
+ {L:[['sine',1,1],['sine',.5,.55],['triangle',2,.2]],dr:1.6,lp:900,dc:.3,pk:1},
+ {L:[['sawtooth',1,.5],['sine',.5,.6]],dr:1.2,lp:520,dc:.3,pk:1},
+ null,
+ {L:[['square',1,.4],['sine',.5,.6]],dr:2.2,lp:700,dc:.25,pk:.95},
+ {L:[['triangle',1,1],['sine',.5,.5],['sine',2,.25]],dr:1.4,lp:600,dc:.12,pk:1},
+ {L:[['sawtooth',1,.45],['sawtooth',1.006,.45],['sine',.5,.6]],dr:3.5,lp:650,dc:.4,pk:.9},
+ {L:[['square',1,.35],['sine',.5,.6]],dr:1,lp:420,dc:.2,pk:1}
+];
+function bassVoice(f,t,at,bd,tm){
+  if(tm===2){fmv(f,1,2.2,.3,t,at,bd,.9,.12,1000);bv(f,t,at,bd,.6,.12,[['sine',.5,1]],0,500,.3);return;}
+  const B=BASS[tm];bv(f,t,at,bd,B.pk,.12,B.L,B.dr,B.lp,B.dc);
+}
 function drone(f,t,a,d,pk,wet){
   const dur=a+d+.1,k=bus(t,a,d,pk,wet),fl=ac.createBiquadFilter(),lf=osc('sine',.07+Math.random()*.06,t,dur),lg=ac.createGain();
   fl.type='lowpass';fl.frequency.value=0;fl.Q.value=1.5;lg.gain.value=170;lf.connect(lg);lg.connect(fl.frequency);curBus.cs.connect(fl.frequency);
@@ -412,11 +454,15 @@ function drone(f,t,a,d,pk,wet){
   fl.connect(k);trk(lf,k,t);
   const cs=curBus.cs,pv=lf.onended;lf.onended=()=>{pv&&pv();try{cs.disconnect(fl.frequency);}catch(e){}};
 }
-function drum(v,t){
-  if(v===0){const o=osc('sine',150,t,.45),g=gain();o.frequency.exponentialRampToValueAtTime(45,t+.12);env(g,t,.003,.38,1);o.connect(g);recN(0,t,36,.1,112);}
-  else if(v===1){const o=osc('square',820,t,.1),g=gain();env(g,t,.001,.05,.35);o.connect(g);hit(t,.04,2500,'highpass',.4);recN(0,t,37,.1,80);}
-  else if(v===2){const hp=.3+Math.random()*.25;hit(t,.06,7000,'highpass',hp);recN(0,t,42,.08,40+(hp-.3)/.25*50);}
-  else{const o=osc('sine',330,t,.3),g=gain();o.frequency.exponentialRampToValueAtTime(250,t+.06);env(g,t,.002,.22,.85);o.connect(g);recN(0,t,63,.15,95);}
+function drum(v,t,vel){
+  const k=vel===undefined?1:vel/100,vv=vel===undefined?0:vel;
+  if(v===0){const o=osc('sine',150,t,.45),g=gain();o.frequency.exponentialRampToValueAtTime(45,t+.12);env(g,t,.003,.38,k);o.connect(g);recN(0,t,36,.1,vv||112);}
+  else if(v===1){const o=osc('square',820,t,.1),g=gain();env(g,t,.001,.05,.35*k);o.connect(g);hit(t,.04,2500,'highpass',.4*k);recN(0,t,37,.1,vv||80);}
+  else if(v===2){const hp=(.3+Math.random()*.25)*k;hit(t,.06,7000,'highpass',hp);recN(0,t,42,.08,vv||(40+(hp/k-.3)/.25*50));}
+  else if(v===3){const o=osc('sine',330,t,.3),g=gain();o.frequency.exponentialRampToValueAtTime(250,t+.06);env(g,t,.002,.22,.85*k);o.connect(g);recN(0,t,63,.15,vv||95);}
+  else if(v<=6){const f=[230,170,125][v-4],o=osc('sine',f*1.5,t,.5),g=gain();o.frequency.exponentialRampToValueAtTime(f,t+.09);env(g,t,.003,.32,.9*k);o.connect(g);hit(t,.03,1800,'bandpass',.18*k);recN(0,t,[50,47,43][v-4],.2,vv||90);}
+  else if(v===7){const o=osc('triangle',190,t,.2),g=gain();env(g,t,.002,.12,.5*k);o.connect(g);hit(t,.16,1800,'bandpass',.55*k);recN(0,t,38,.12,vv||95);}
+  else{hit(t,.9,5200,'highpass',.4*k);recN(0,t,49,.8,vv||105);}
 }
 function play(i,t,p,fo){
   const c=C[i];curBus=c.bus;
@@ -427,10 +473,8 @@ function play(i,t,p,fo){
     if(c.bp){const rr=ch>=5?ch-7:ch;at=.01;bd=Math.min(p*1.6,1.4);
       r=c.bp===3?rr+[0,7,0,4][c.bi++%4]:rr+(Math.random()<.2?4:0);}
     if(fo!==undefined)r=fo;
-    const bf=fq(r,24),tm=c.tm;recN(1,t,mn(bf),bd,c.bp?100:85);
-    if(tm===0){note(bf,t,'sine',at,bd,.7,.15,500);note(bf*2,t,'triangle',at,bd*.7,.12,.15,700);}
-    else if(tm===1){note(bf,t,'sawtooth',at,bd,.38,.15,380);note(bf,t,'sine',at,bd,.5,.15,500);}
-    else{fmv(bf,1,2.4,.3,t,at,bd,.6,.15,800);note(bf,t,'sine',at,bd,.4,.15,500);}
+    const bf=fq(r,36),tm=c.tm;recN(1,t,mn(bf),bd,c.bp?100:85);
+    bassVoice(bf,t,at,bd,tm);
   }else if(i===2){
     const f=fq(fo!==undefined?fo:(c.arp?arpIdx(c,ch):walk(c,-2,8,ch)),60),tm=c.tm;recN(2,t,mn(f),[2,1.2,2,1.8,2.2][tm],75);
     if(tm===0)fmv(f,2.76,1.3,.9,t,.004,3,.16,.75,1500);
@@ -457,7 +501,14 @@ function sched(){
       const t=t0+c.k*p;
       if(i===0){
         curBus=c.bus;let h=false;
-        PRE[c.pre].l.forEach(L=>{if(eu(c.k,L)){drum(L.s,t);h=true;}});
+        if(c.fq&&c.k%4===0){c.fq=false;c.fl={k0:c.k,v:FILLS[Math.random()*FILLS.length|0]};}
+        let inF=false;
+        if(c.fl){
+          const q=c.k-c.fl.k0;
+          if(q<c.fl.v.length){c.fl.v[q].forEach(([v,vel])=>drum(v,t,vel));h=true;inF=true;}
+          else{drum(8,t,115);h=true;c.fl=null;}
+        }
+        if(!inF)PRE[c.pre].l.forEach(L=>{if(eu(c.k,L)){drum(L.s,t);h=true;}});
         if(h)c.ls=t;
       }else if(i===1&&c.bp){
         let h;
@@ -487,7 +538,7 @@ function toggle(i){
   init();const c=C[i];
   if(c.on){c.on=false;return;}
   if(!anyOn()){t0=ac.currentTime+.05;chords=[0];keys=[pc];tgt=null;pend=null;kp=pc;}
-  c.on=true;c.k=Math.ceil((ac.currentTime+.03-t0)/per(c));
+  c.on=true;c.fq=false;c.fl=null;c.k=Math.ceil((ac.currentTime+.03-t0)/per(c));
 }
 function setBpm(v){
   v=Math.max(40,Math.min(200,Math.round(v)));
@@ -517,7 +568,7 @@ C.forEach((c,i)=>{
     c.rbs.forEach((b,j)=>b.classList.toggle('on',R[j]===c.ratio));
   };
   ui();
-  c.vol=.8;c.fv=1;c.balls=[];c.nb=0;c.arp=false;c.as=0;
+  c.vol=i===1?.95:.8;c.fv=1;c.balls=[];c.nb=0;c.arp=false;c.as=0;
   const pt=e=>{const r=c.cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,w:r.width};};
   const inB=e=>{const r=c.cv.getBoundingClientRect();return Math.hypot(e.clientX-r.right+24,e.clientY-r.bottom+24)<26;};
   const grab=e=>{
@@ -534,6 +585,7 @@ C.forEach((c,i)=>{
     if(inK(e)){c.vd={y:e.clientY,v:c.vol};c.cv.setPointerCapture(e.pointerId);}
     else if(i&&inT(e)){c.tm=(c.tm+1)%TIMB[i].length;c.tms=performance.now();init();if(i===3)setFlt(c,c.tm===2?.19:1);play(i,ac.currentTime+.02,1.2);}
     else if(inF(e)){c.fd={y:e.clientY,v:c.fv};c.fms=performance.now();c.cv.setPointerCapture(e.pointerId);}
+    else if(i===0&&inB(e)){if(c.on&&!c.fl)c.fq=!c.fq;}
     else if(i&&inB(e)){c.nb=(c.nb+1)%4;while(c.balls.length>c.nb)c.balls.pop();while(c.balls.length<c.nb)c.balls.push(newBall());}
     else if(i&&grab(e)){c.cv.setPointerCapture(e.pointerId);}
     else toggle(i);
@@ -706,6 +758,10 @@ function frame(){
           x.globalAlpha=h?(e?1:.85):(e?.8:.4);x.fillStyle=h?col:mut;
           x.beginPath();x.arc(m+rr*Math.cos(a),m+rr*Math.sin(a),(h?2.6:1.5)+(e?1.4:0),0,7);x.fill();}
       });x.globalAlpha=1;}
+    if(i===0){const bx=w-24,by=w-24,fa=!!c.fl,fq=!!c.fq;
+      x.lineWidth=3;x.strokeStyle=dim;x.beginPath();x.arc(bx,by,12,0,7);x.stroke();
+      if(fa||fq){x.globalAlpha=fa?1:.5+.5*Math.sin(pn/120);x.fillStyle='#e8a10f';x.beginPath();x.arc(bx,by,12,0,7);x.fill();x.globalAlpha=1;}
+      x.fillStyle=fa||fq?'#0f1420':col;x.globalAlpha=c.on?1:.7;x.font='700 9px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('fill',bx,by+.5);x.globalAlpha=1;}
     if(i){
       (c.hf=(c.hf||[]).filter(h=>pn-h.t<450)).forEach(h=>{const u=(pn-h.t)/450;if(u<0)return;x.globalAlpha=(1-u)*.9;x.strokeStyle=col;x.lineWidth=7*(1-u)+2;x.beginPath();x.arc(m,m,r,h.a-.3,h.a+.3);x.stroke();});
       c.balls.forEach(b=>{
